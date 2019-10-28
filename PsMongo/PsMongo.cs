@@ -80,6 +80,17 @@ namespace PsMongo
             this.MongoPassword = localmongopassword;
             this.BindToMongo(mongoServer, databaseName, localmongousername, localmongopassword);
         }
+        public PsMongoContext(string mongoServer, string databaseName, string localmongousername, string localmongopassword, string localoptions)
+        {
+            this.MongoServer = mongoServer;
+            this.MongoDatabaseName = databaseName;
+            this.MongoUsername = localmongousername;
+            this.MongoPassword = localmongopassword;
+            this.BindToMongo(mongoServer, databaseName, localmongousername, localmongopassword, localoptions);
+        }
+
+
+
         private PsMongoContext BindToMongo(string server)
         {
             try
@@ -133,7 +144,7 @@ namespace PsMongo
         {
             try
             {
-                var connectionString = string.Format("mongodb://{0}:{1}@{2}:27017", localmongousername, localmongopassword, server);
+                var connectionString = string.Format("mongodb://{0}:{1}@{2}:27017?authSource=$external&authMechanism=PLAIN", localmongousername, localmongopassword, server);
                 this.IMongoClient = new MongoClient(connectionString);
                 this.MongoIsConnected = true;
                 return this;
@@ -148,7 +159,24 @@ namespace PsMongo
         {
             try
             {
-                var connectionString = string.Format("mongodb://{0}:{1}@{2}:27017/{3}", localmongousername, localmongopassword, server, databasename);
+                var connectionString = string.Format("mongodb://{0}:{1}@{2}:27017/{3}?authSource=$external&authMechanism=PLAIN", localmongousername, localmongopassword, server, databasename);
+                this.IMongoClient = new MongoClient(connectionString);
+                this.IMongoDatabase = this.IMongoClient.GetDatabase(databasename);
+                this.MongoIsConnected = true;
+                return this;
+            }
+            catch (Exception e)
+            {
+                this.MongoIsConnected = false;
+                throw new Exception("Something went wrong Binding to Mongo! Full Error:\r\n\r\n" + e.Message);
+            }
+        }
+        private PsMongoContext BindToMongo(string server, string databasename, string localmongousername, string localmongopassword, string localoptions)
+        {
+            try
+            {
+                //mongodb://[username:password@]host1[:port1][,...hostN[:portN]][/[database][?options]]
+                var connectionString = string.Format("mongodb://{0}:{1}@{2}:27017/{3}?{4}", localmongousername, localmongopassword, server, databasename, localoptions);
                 this.IMongoClient = new MongoClient(connectionString);
                 this.IMongoDatabase = this.IMongoClient.GetDatabase(databasename);
                 this.MongoIsConnected = true;
@@ -281,6 +309,21 @@ namespace PsMongo
                     collection.DeleteOne(doc);
                     return true;
                 }
+            }
+            catch (Exception e)
+            {
+                var m = string.Format("Something went wrong while removing document from collection! Full Error:\r\n\r\n{0}", e.Message);
+                throw new Exception(m);
+            }
+        }
+
+        public bool CleanMongoCollection(string collectionName)
+        {
+            try
+            {
+                var collection = this.IMongoDatabase.GetCollection<BsonDocument>(collectionName);
+                collection.DeleteMany(new BsonDocument());
+                return true;
             }
             catch (Exception e)
             {
